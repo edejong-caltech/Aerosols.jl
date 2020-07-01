@@ -12,25 +12,28 @@ function main()
 
   # Initial condition: Whitby 1978 marine nuclei mode (nm)
   S_init = 0.000
-  distribution = Gamma(340.0, 1.4035225, 3.8563636)
+  dist_init = GammaPrimitiveParticleDistribution(340.0, 1.4035225, 3.8563636)
   v_up = Float64(1.0)
   moments_S_init = [0.0, 0.0, 0.0, S_init]
+  println("Initializing with moments:")
   for k in 0:2
-    moments_S_init[k+1] = moment(distribution, Float64(k))
+    moments_S_init[k+1] = moment(dist_init, Float64(k))
     println(moments_S_init[k+1])
   end
-  rhs(m,p,t) = get_aerosol_growth_3mom(m, distribution, v_up)
+  println("Supersaturation: ", S_init)
+  println()
 
+  ODE_parameters = Dict(:dist => dist_init)
+
+  
   # set up ODE
-  tspan = (0.0, 1000.0)
-  prob = ODEProblem(rhs, moments_S_init, tspan)
+  rhs(m, par, t) = get_aerosol_growth_3mom(m, par, t, v_up)
+  tspan = (0.0, 1.0)
+
+  # solve the ODE
+  println("Solving ODE...")
+  prob = ODEProblem(rhs, moments_S_init, tspan, ODE_parameters)
   sol = solve(prob, reltol = tol, abstol = tol)
-  #try
-  #  sol = solve(prob, reltol = tol, abstol = tol)
-  #catch e
-  #  println("error in solving diffeq")
-  #  return
-  #end
 
   # Plot the solution for the 0th moment
   pyplot()
@@ -72,7 +75,7 @@ function main()
 end
 
 """
-get_aerosol_growth_3mom(mom_p::Array{Float64}, dist::ParticleDistribution{Float64}, v_up::Float64=1)
+get_aerosol_growth_3mom(mom_p::Array{Float64}, v_up::Float64=1)
 
   - 'T' - temperature in K
   - 'P' - pressure in Pa
@@ -83,20 +86,13 @@ get_aerosol_growth_3mom(mom_p::Array{Float64}, dist::ParticleDistribution{Float6
   - 'a' = [G, GA, -G k rd^3, alpha, gamma] [=] [m2/sec, m3/sec, m5/sec, 1/m2, 1/m3]
 
 """
-function get_aerosol_growth_3mom(mom_p::Array{Float64}, dist::ParticleDistribution{Float64}, v_up::Float64=1)
-  println(mom_p)
-
-  # error handling
-  if (mom_p[3] <= 0)
-    throw(DomainError(mom_p,"Second moment is negative"))
-  end
+function get_aerosol_growth_3mom(mom_p::Array{Float64}, ODE_parameters::Dict, t::Float64, v_up::Float64=1.0)
+  println(t, mom_p)
   
-  try
-    dist = update_params_from_moments(dist, mom_p[1:3])
-  catch e
-    println("Parameter update error")
-    return
-  end
+  dist = update_params_from_moments(ODE_parameters, mom_p[1:3])
+  ODE_parameters[:dist] = dist
+  println(dist)
+
 
   mom_d = Array{Float64}(undef, 4)
   S = mom_p[end]
@@ -117,6 +113,8 @@ function get_aerosol_growth_3mom(mom_p::Array{Float64}, dist::ParticleDistributi
   ddt[3] = 2*(coeffs[1]*S*mom[0+s] + coeffs[2]*mom[-1+s] + coeffs[3]*mom[-3+s]);
   # dS/dt 
   ddt[end] = coeffs[4]*v_up - coeffs[5]*(coeffs[1]*S*mom[1+s] + coeffs[2]*mom[0+s] + coeffs[3]*mom[-2+s])
+  println(ddt)
+  println()
   return ddt
 end
 
