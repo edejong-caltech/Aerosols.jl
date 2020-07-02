@@ -1,5 +1,9 @@
-Emily's code for an aerosol activation model, still in progress
+Emily's code for an aerosol activation model
+
+Run aerosol-mom.jl
 
 Dependencies:
 
     - CliMA "Cloudy" module
+    - DifferentialEquations
+    - PyPlot
