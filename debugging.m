@@ -2,11 +2,11 @@
 clear all;
 
 kappa = 0.6;
-rd = 1.0;
+rd = 10.0;
 T = 285;
 P = 95000;
 
-V = 1.0;
+V = 1.0e-6; % 1 cm3
 
   cp = 1005               % Specific heat of air: J/kg K 
   Mw = 0.018              % Molecular weight of water: kg/mol
@@ -17,7 +17,7 @@ V = 1.0;
   rho_w = 997             % density of water (kg/m3)
 
   P_atm = P/101325        % Pressure (atm)
-  Dv = (0.211/P_atm) * (T/273)^(1.94e-4) % Mass diffusivity of water in air (m2/s or J/kg)
+  Dv = (0.211/P_atm) * (T/273)^(1.94)*(1e-4) % Mass diffusivity of water in air (m2/s or J/kg)
   
   % temperature-dependent parameters
   temp_c = T - 273.15
@@ -35,7 +35,7 @@ V = 1.0;
   % density of air (kg/m3)
   rho_a = P/(287.058*T)
   % latent heat of vaporization: J/kg
-  Hv = (2.5*((273.15/T)^(0.167+3.67e-4*T)))*1000
+  Hv = (2.5*((273.15/T)^(0.167+3.67e-4*T)))*1e6
   
   % Generalized coefficients
   G = 1/((rho_w*R*T/Po/Dv/Mw) + (Hv*rho_w/ka/T/(Hv*Mw/T/R - 1))) * 1e18     %nm2/sec
@@ -53,19 +53,23 @@ V = 1.0;
   a(5) = gamma2;          %1/nm3
 
   %%
-  N = 340.0;
-  k = 3.85;
-  theta = 1.4;
+  clear gamma
+  N = 100.0;
+  k = 3.8564;
+  theta = 28.0704505;
   M = zeros(8,1);
-  S = 0.005;
-  s = 6;
+  S = 0.000;
+  v_up = 1;
+  s = 5;
  
-  for q=-5:2
+  for q=-4:2
       M(q+s) = N*theta^q*gamma(k+q)/gamma(k);
   end
   
   dMdt = zeros(3,1);
   
-  for p=0:3
+  for p=1:3
       dMdt(p+1) = p*(a(1)*M(p-2+s)*S+a(2)*M(p-3+s)+a(3)*M(p-5+s))
   end
+  
+  dSdt = alpha*v_up - gamma2*dMdt(end)/3

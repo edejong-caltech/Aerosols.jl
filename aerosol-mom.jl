@@ -10,10 +10,12 @@ function main()
   FT = Float64
   tol = 1e-8
 
-  # Initial condition: Whitby 1978 marine nuclei mode (nm)
-  S_init = 0.000
-  dist_init = GammaPrimitiveParticleDistribution(340.0, 1.4035225, 3.8563636)
+  # Initial condition:
+  S_init = 0.02
+  dist_init = GammaPrimitiveParticleDistribution(100.0, 28.0704505, 3.8564)
   v_up = Float64(1.0)
+  tspan = (0.0, 1.0)
+
   moments_S_init = [0.0, 0.0, 0.0, S_init]
   println("Initializing with moments:")
   for k in 0:2
@@ -28,12 +30,12 @@ function main()
   
   # set up ODE
   rhs(m, par, t) = get_aerosol_growth_3mom(m, par, t, v_up)
-  tspan = (0.0, 1.0)
+  
 
   # solve the ODE
   println("Solving ODE...")
   prob = ODEProblem(rhs, moments_S_init, tspan, ODE_parameters)
-  sol = solve(prob, reltol = tol, abstol = tol)
+  sol = solve(prob, Tsit5(), reltol = tol, abstol = tol)
 
   # Plot the solution for the 0th moment
   pyplot()
@@ -87,33 +89,34 @@ get_aerosol_growth_3mom(mom_p::Array{Float64}, v_up::Float64=1)
 
 """
 function get_aerosol_growth_3mom(mom_p::Array{Float64}, ODE_parameters::Dict, t::Float64, v_up::Float64=1.0)
-  println(t, mom_p)
+  println("time: ", t)
+  println("prognostic moments: ", mom_p)
   
   dist = update_params_from_moments(ODE_parameters, mom_p[1:3])
   ODE_parameters[:dist] = dist
-  println(dist)
-
+  println("Distribution: ", dist)
 
   mom_d = Array{Float64}(undef, 4)
   S = mom_p[end]
 
-  # compute the diagnostic moments: M-1 through M-5
+  # compute the diagnostic moments: M-1 through M-4
   s = 5; #add to moment indexing
   for k in -4:-1
     mom_d[k+s] = moment(dist, Float64(k))
   end
   mom = vcat(mom_d, mom_p)
+  println(mom)
 
   coeffs = get_aerosol_coefficients()
   ddt = Array{Float64}(undef,4)
 
   # compute the time rate of change
   ddt[1] = 0;
-  ddt[2] = coeffs[1]*S*mom[-1+s] + coeffs[2]*mom[-2+s] + coeffs[3]*mom[-4+s];
-  ddt[3] = 2*(coeffs[1]*S*mom[0+s] + coeffs[2]*mom[-1+s] + coeffs[3]*mom[-3+s]);
+  ddt[2] = coeffs[1]*S*mom[-1+s] + coeffs[2]*mom[-2+s] + coeffs[3]*mom[-4+s]
+  ddt[3] = 2*(coeffs[1]*S*mom[0+s] + coeffs[2]*mom[-1+s] + coeffs[3]*mom[-3+s])
   # dS/dt 
   ddt[end] = coeffs[4]*v_up - coeffs[5]*(coeffs[1]*S*mom[1+s] + coeffs[2]*mom[0+s] + coeffs[3]*mom[-2+s])
-  println(ddt)
+  println("Derivative wrt  time: ", ddt)
   println()
   return ddt
 end
@@ -131,8 +134,8 @@ V::Float64=1)
   - 'a' = [G, GA, -G k rd^3, alpha, gamma] [=] [m2/sec, m3/sec, m5/sec, 1/m2, 1/m3]
 
 """
-function get_aerosol_coefficients(;kappa::Float64=0.6, rd::Float64=1.0, T::Float64=285.0, P::Float64=95000.0, 
-  V::Float64=1.0)
+function get_aerosol_coefficients(;kappa::Float64=0.6, rd::Float64=10.0, T::Float64=285.0, P::Float64=95000.0, 
+  V::Float64=1.0e-6)
 
   # specify physical constants
   FT = Float64
@@ -145,7 +148,7 @@ function get_aerosol_coefficients(;kappa::Float64=0.6, rd::Float64=1.0, T::Float
   rho_w = 997             # density of water (kg/m3)
 
   P_atm = P/101325        # Pressure (atm)
-  Dv = (0.211/P_atm) * (T/273)^(1.94e-4) # Mass diffusivity of water in air (m2/s or J/kg)
+  Dv = (0.211/P_atm) * (T/273)^(1.94)*1e-4 # Mass diffusivity of water in air (m2/s or J/kg)
   
   # temperature-dependent parameters
   temp_c = T - 273.15
@@ -163,7 +166,7 @@ function get_aerosol_coefficients(;kappa::Float64=0.6, rd::Float64=1.0, T::Float
   # density of air (kg/m3)
   rho_a = P/(287.058*T)
   # latent heat of vaporization: J/kg
-  Hv = (2.5*((273.15/T)^(0.167+3.67e-4*T)))*1000
+  Hv = (2.5*((273.15/T)^(0.167+3.67e-4*T)))*1e6
   
   # Generalized coefficients
   G = 1/((rho_w*R*T/Po/Dv/Mw) + (Hv*rho_w/ka/T/(Hv*Mw/T/R - 1))) * 1e18     #nm2/sec
