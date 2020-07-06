@@ -5,7 +5,7 @@ using DifferentialEquations
 using Plots
 
 using Cloudy.ParticleDistributions
-using Cloudy.ParticleDistributions: GammaPrimitiveParticleDistribution
+using Cloudy.ParticleDistributions
 
 function main()
   # Numerical parameters
